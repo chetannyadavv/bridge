@@ -1,0 +1,79 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+/*
+  BRIDGE — design tokens
+  --------------------------------------------------------------
+  Subject: a shared ledger where two parties meet at a dividing
+  line to settle a claim. The palette reads like an actual ledger
+  book — cool paper, ink, and two side-colors for the two parties
+  either side of the bridge — with a single settlement green used
+  only for agreement/resolution moments.
+*/
+
+@theme {
+  /* Paper & ink */
+  --color-paper: #EEF1F0;
+  --color-paper-raised: #FFFFFF;
+  --color-ink: #182129;
+  --color-ink-soft: #4B5560;
+  --color-ink-faint: #8993A0;
+  --color-hairline: #D8DEDC;
+
+  /* Structural navy — headers, chrome */
+  --color-navy: #16233F;
+  --color-navy-soft: #2A3A5C;
+
+  /* Two sides of the bridge */
+  --color-cardholder: #A94C3B;
+  --color-cardholder-tint: #F4E4DF;
+  --color-merchant: #2C5F8A;
+  --color-merchant-tint: #DFEAF2;
+
+  /* Settlement — the only "good news" color, used sparingly */
+  --color-settlement: #2F6F4E;
+  --color-settlement-tint: #DEEBE2;
+
+  /* Status / caution */
+  --color-caution: #B8862F;
+  --color-caution-tint: #F3E9D5;
+
+  --font-display: "Fraunces", "Iowan Old Style", serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius-card: 0.375rem;
+}
+
+html {
+  font-family: var(--font-body);
+  color: var(--color-ink);
+  background: var(--color-paper);
+}
+
+body {
+  min-height: 100vh;
+}
+
+::selection {
+  background: var(--color-settlement-tint);
+  color: var(--color-ink);
+}
+
+/* Utility for the ledger-rule background used on the workspace */
+.bg-ledger {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 27px,
+    var(--color-hairline) 28px
+  );
+}
+
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-navy);
+  outline-offset: 2px;
+}
