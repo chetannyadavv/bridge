@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppShell, PageHeading } from "@/components/layout/AppShell";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { primaryDispute } from "@/data/mockData";
+import { useDisputes } from "@/lib/DisputeContext";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 const reasons = [
@@ -25,13 +25,38 @@ const mockTransactions = [
 
 export function CreateDispute() {
   const navigate = useNavigate();
-  const [selectedTxn, setSelectedTxn] = useState<string | null>(mockTransactions[0].id);
-  const [reason, setReason] = useState<string>(reasons[1]);
+  const { createDispute } = useDisputes();
+  const [selectedTxn, setSelectedTxn] = useState<string | null>(null);
+  const [reason, setReason] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit() {
-    // Mock-only: routes straight into the seeded demo workspace regardless
-    // of selection. Real submission is owned by the Session Service.
-    navigate(`/disputes/${primaryDispute.id}`);
+  async function handleSubmit() {
+    if (!selectedTxn || !reason) {
+      setError("Select a transaction and a reason before continuing.");
+      return;
+    }
+
+    const txn = mockTransactions.find((t) => t.id === selectedTxn);
+    if (!txn) {
+      setError("That transaction couldn't be found — pick another.");
+      return;
+    }
+
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const newId = await createDispute({
+        transactionId: txn.id,
+        merchantName: txn.merchant,
+        amount: txn.amount,
+        reason,
+      });
+      navigate(`/disputes/${newId}`);
+    } catch {
+      setError("Couldn't open the dispute — the backend may be unreachable. Try again.");
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -52,7 +77,10 @@ export function CreateDispute() {
               {mockTransactions.map((txn) => (
                 <button
                   key={txn.id}
-                  onClick={() => setSelectedTxn(txn.id)}
+                  onClick={() => {
+                    setSelectedTxn(txn.id);
+                    setError(null);
+                  }}
                   className={`focus-ring flex w-full items-center justify-between rounded-md border px-3.5 py-3 text-left transition-colors ${
                     selectedTxn === txn.id
                       ? "border-navy bg-black/[0.02]"
@@ -79,7 +107,10 @@ export function CreateDispute() {
               {reasons.map((r) => (
                 <button
                   key={r}
-                  onClick={() => setReason(r)}
+                  onClick={() => {
+                    setReason(r);
+                    setError(null);
+                  }}
                   className={`focus-ring rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                     reason === r
                       ? "border-navy bg-navy text-white"
@@ -91,8 +122,10 @@ export function CreateDispute() {
               ))}
             </div>
 
-            <Button className="mt-6" onClick={handleSubmit}>
-              Open the negotiation table
+            {error && <p className="mt-3 text-xs font-medium text-cardholder">{error}</p>}
+
+            <Button className="mt-6" onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? "Opening…" : "Open the negotiation table"}
             </Button>
           </CardBody>
         </Card>

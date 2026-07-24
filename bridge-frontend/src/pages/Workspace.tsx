@@ -1,4 +1,5 @@
-import { Outlet, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Outlet, useNavigate, useParams, Link } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { WorkspaceTabs } from "@/components/layout/WorkspaceTabs";
 import { PresenceStrip } from "@/components/dispute/PresenceStrip";
@@ -6,15 +7,61 @@ import { CaseStatusPanel } from "@/components/dispute/CaseStatusPanel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { useRole } from "@/lib/RoleContext";
-import { mockDisputes, mockCaseStatus } from "@/data/mockData";
+import { useDisputes } from "@/lib/DisputeContext";
 import { formatCurrency } from "@/lib/utils";
 
 export function Workspace() {
   const { id } = useParams();
   const { role } = useRole();
   const navigate = useNavigate();
+  const { getDispute, getCaseStatus, getPresence, getConnectionStatus, loadDispute, subscribeToDispute } =
+    useDisputes();
+  const [isLoading, setIsLoading] = useState(true);
 
-  const dispute = mockDisputes.find((d) => d.id === id) ?? mockDisputes[0];
+  useEffect(() => {
+    if (!id) return;
+    setIsLoading(true);
+    loadDispute(id).finally(() => setIsLoading(false));
+  }, [id, loadDispute]);
+
+  // Opens a live connection for this dispute+role while the Workspace is
+  // mounted, and tears it down on unmount or when id/role changes —
+  // switching roles via the header toggle correctly rejoins the room
+  // under the new role, updating presence.
+  useEffect(() => {
+    if (!id) return;
+    return subscribeToDispute(id, role);
+  }, [id, role, subscribeToDispute]);
+
+  const dispute = getDispute(id ?? "");
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <p className="text-sm text-ink-faint">Loading dispute…</p>
+      </AppShell>
+    );
+  }
+
+  if (!dispute) {
+    return (
+      <AppShell>
+        <div className="rounded-[var(--radius-card)] border border-hairline bg-paper-raised p-8 text-center">
+          <p className="font-display text-lg font-semibold text-ink">Dispute not found</p>
+          <p className="mt-1 text-sm text-ink-soft">
+            This dispute doesn't exist — it may have been created in a different
+            session, or the link is out of date.
+          </p>
+          <Link to="/analyst" className="mt-4 inline-block">
+            <Button variant="secondary" size="sm">
+              Back to dashboard
+            </Button>
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
+
   const counterparty = role === "cardholder" ? dispute.merchant : dispute.customer;
 
   return (
@@ -35,18 +82,15 @@ export function Workspace() {
         <div className="flex items-center gap-2">
           <StatusPill status={dispute.status} />
           <Button variant="secondary" size="sm" onClick={() => navigate(`/disputes/${dispute.id}/resolution`)}>
-            View resolution (demo)
+            View resolution
           </Button>
         </div>
       </div>
 
       <div className="rounded-[var(--radius-card)] border border-hairline bg-paper-raised">
         <PresenceStrip
-          message={
-            role === "cardholder"
-              ? "Merchant is reviewing evidence…"
-              : "Cardholder is reviewing evidence…"
-          }
+          presence={getPresence(dispute.id)}
+          connectionStatus={getConnectionStatus(dispute.id)}
         />
 
         <div className="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_240px]">
@@ -59,7 +103,7 @@ export function Workspace() {
             <p className="mb-3 font-mono text-xs uppercase tracking-wide text-ink-faint">
               Case status
             </p>
-            <CaseStatusPanel steps={mockCaseStatus} />
+            <CaseStatusPanel steps={getCaseStatus(dispute.id)} />
           </aside>
         </div>
       </div>

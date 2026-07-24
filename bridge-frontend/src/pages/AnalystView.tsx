@@ -3,7 +3,8 @@ import { AppShell, PageHeading } from "@/components/layout/AppShell";
 import { Card, CardBody } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { useRole } from "@/lib/RoleContext";
-import { mockDisputes, mockAnalystStats } from "@/data/mockData";
+import { useDisputes } from "@/lib/DisputeContext";
+import { mockAnalystStats } from "@/data/mockData";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
@@ -19,6 +20,11 @@ function StatTile({ label, value }: { label: string; value: string | number }) {
 
 export function AnalystView() {
   const { role } = useRole();
+  const { disputes } = useDisputes();
+
+  const sorted = [...disputes].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
   return (
     <AppShell>
@@ -45,7 +51,7 @@ export function AnalystView() {
 
       <Card>
         <div className="divide-y divide-hairline">
-          {mockDisputes.map((dispute) => (
+          {sorted.map((dispute) => (
             <Link
               key={dispute.id}
               to={`/disputes/${dispute.id}`}

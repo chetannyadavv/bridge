@@ -1,11 +1,12 @@
 import { useParams, Link } from "react-router-dom";
 import { TimelineRail } from "@/components/dispute/TimelineRail";
-import { mockTimeline } from "@/data/mockData";
+import { useDisputes } from "@/lib/DisputeContext";
 import { CheckCircle2 } from "lucide-react";
 
 export function Timeline() {
   const { id } = useParams();
-  const events = mockTimeline.filter((e) => e.disputeId === id);
+  const { getTimeline } = useDisputes();
+  const events = getTimeline(id ?? "");
 
   return (
     <div>
@@ -15,7 +16,11 @@ export function Timeline() {
         see when the case opens.
       </div>
 
-      <TimelineRail events={events.length ? events : mockTimeline} />
+      {events.length > 0 ? (
+        <TimelineRail events={events} />
+      ) : (
+        <p className="text-sm text-ink-faint">No activity yet.</p>
+      )}
 
       <Link
         to={`/disputes/${id}/evidence`}

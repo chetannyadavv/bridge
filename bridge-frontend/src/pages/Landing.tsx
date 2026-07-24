@@ -3,7 +3,11 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { ScanSearch, MessagesSquare, FileCheck2, Scale, CheckCircle2 } from "lucide-react";
-import { mockDisputes } from "@/data/mockData";
+
+// The seeded demo dispute — created server-side on first backend startup
+// (see bridge-backend/app/seed.py). Kept as a fixed id rather than an
+// import from mockData.ts, since dispute data is now backend-owned.
+const SEEDED_DEMO_DISPUTE_ID = "dsp_8841";
 
 const howItWorks = [
   { icon: ScanSearch, name: "Timeline updated", copy: "Built automatically the moment a dispute opens." },
@@ -37,7 +41,7 @@ export function Landing() {
             <Link to="/disputes/new">
               <Button size="md">Start a dispute</Button>
             </Link>
-            <Link to={`/disputes/${mockDisputes[0].id}`}>
+            <Link to={`/disputes/${SEEDED_DEMO_DISPUTE_ID}`}>
               <Button size="md" variant="secondary">
                 View a live workspace
               </Button>

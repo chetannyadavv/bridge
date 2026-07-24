@@ -3,7 +3,7 @@ import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Scale } from "lucide-react";
 import { cn, formatDateTime } from "@/lib/utils";
 
-const recommendationLabel = {
+export const recommendationLabel = {
   FULL_REFUND: "Full refund",
   PARTIAL_REFUND: "Partial refund",
   NO_REFUND: "No refund",
