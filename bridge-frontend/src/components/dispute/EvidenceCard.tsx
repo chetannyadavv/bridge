@@ -50,6 +50,7 @@ export function EvidenceCard({
           <button
             onClick={() => onContest(evidence.id)}
             title="Contest this evidence (stretch goal — placeholder)"
+            aria-label="Contest this evidence"
             className="focus-ring rounded p-1 text-ink-faint hover:text-caution"
           >
             <Flag size={14} />

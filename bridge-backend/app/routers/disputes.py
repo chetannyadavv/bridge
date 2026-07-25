@@ -9,6 +9,8 @@ from app.schemas.evidence import EvidenceCreate, EvidenceOut
 from app.schemas.timeline_event import TimelineEventOut
 from app.schemas.recommendation import RecommendationOut, AcceptRecommendationRequest
 from app.services import dispute_service, evidence_service, timeline_service, recommendation_service
+from app.services.recommendation_service import get_latest_recommendation
+from app.decision_engine import DecisionEngine
 from app.websocket.manager import manager
 from app.websocket.snapshot import build_dispute_snapshot_messages
 
@@ -75,6 +77,25 @@ async def post_evidence(dispute_id: str, payload: EvidenceCreate, db: Session = 
 def get_recommendation(dispute_id: str, db: Session = Depends(get_db)):
     _get_dispute_or_404(db, dispute_id)
     return recommendation_service.list_recommendations(db, dispute_id)
+
+
+@router.get("/{dispute_id}/decision", response_model=RecommendationOut)
+def get_decision(dispute_id: str, db: Session = Depends(get_db)):
+    """
+    Returns the latest Decision Engine output in full — reason code,
+    category, the 5-way engine recommendation, confidence, summary,
+    reasons, missing evidence, and next steps. Reuses the same
+    RecommendationOut schema and the same get_latest_recommendation
+    service function as /recommendation, rather than returning the raw
+    internal DecisionResult dataclass (which was never meant to leave
+    the engine layer, and doesn't match this endpoint's documented
+    contract).
+    """
+    _get_dispute_or_404(db, dispute_id)
+    latest = recommendation_service.get_latest_recommendation(db, dispute_id)
+    if latest is None:
+        raise HTTPException(status_code=404, detail="No decision has been generated yet for this dispute")
+    return latest
 
 
 @router.post("/{dispute_id}/recommendation/accept", response_model=RecommendationOut)

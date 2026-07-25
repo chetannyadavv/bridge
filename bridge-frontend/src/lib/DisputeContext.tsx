@@ -64,6 +64,8 @@ interface CreateDisputeInput {
 
 interface DisputeContextValue {
   disputes: Dispute[];
+  disputesError: string | null;
+  refreshDisputes: () => Promise<void>;
   getDispute: (id: string) => Dispute | undefined;
   getEvidence: (id: string) => EvidenceItem[];
   getTimeline: (id: string) => TimelineEvent[];
@@ -84,6 +86,7 @@ const DisputeContext = createContext<DisputeContextValue | undefined>(undefined)
 export function DisputeProvider({ children }: { children: ReactNode }) {
   const [disputes, setDisputes] = useState<Record<string, Dispute>>({});
   const [disputeList, setDisputeList] = useState<Dispute[]>([]);
+  const [disputesError, setDisputesError] = useState<string | null>(null);
   const [evidence, setEvidence] = useState<Record<string, EvidenceItem[]>>({});
   const [timeline, setTimeline] = useState<Record<string, TimelineEvent[]>>({});
   const [settlement, setSettlement] = useState<Record<string, SettlementRecord[]>>({});
@@ -92,9 +95,14 @@ export function DisputeProvider({ children }: { children: ReactNode }) {
   const loadedIds = useRef<Set<string>>(new Set());
   const sockets = useRef<Record<string, DisputeSocket>>({});
 
-  // Populate the dispute list once on mount, for Landing/Analyst View.
-  useEffect(() => {
-    disputesService.listDisputes().then((list) => {
+  // Sprint 6 robustness: the dispute list fetch previously had no error
+  // handling at all — if the backend was unreachable, this silently
+  // failed and the list just stayed empty forever, with no indication
+  // to the user that anything had gone wrong.
+  const refreshDisputes = useCallback(async () => {
+    try {
+      const list = await disputesService.listDisputes();
+      setDisputesError(null);
       setDisputeList(list);
       setDisputes((prev) => {
         const next = { ...prev };
@@ -103,8 +111,14 @@ export function DisputeProvider({ children }: { children: ReactNode }) {
         });
         return next;
       });
-    });
+    } catch {
+      setDisputesError("Couldn't reach the server. Check your connection and try again.");
+    }
   }, []);
+
+  useEffect(() => {
+    refreshDisputes();
+  }, [refreshDisputes]);
 
   const getDispute = useCallback((id: string) => disputes[id], [disputes]);
   const getEvidence = useCallback((id: string) => evidence[id] ?? [], [evidence]);
@@ -300,6 +314,8 @@ export function DisputeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<DisputeContextValue>(
     () => ({
       disputes: disputeList,
+      disputesError,
+      refreshDisputes,
       getDispute,
       getEvidence,
       getTimeline,
@@ -316,6 +332,8 @@ export function DisputeProvider({ children }: { children: ReactNode }) {
     }),
     [
       disputeList,
+      disputesError,
+      refreshDisputes,
       getDispute,
       getEvidence,
       getTimeline,

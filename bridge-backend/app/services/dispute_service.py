@@ -7,6 +7,7 @@ from app.models.dispute import Dispute, DisputeStatus
 from app.models.transaction import Transaction
 from app.models.timeline_event import TimelineEvent
 from app.schemas.dispute import DisputeCreate
+from app.decision_engine.reason_codes import infer_reason_code
 
 # No authentication in this sprint — every dispute is filed by the same
 # demo cardholder persona, matching the frontend's mock customer from
@@ -40,6 +41,7 @@ def create_dispute(db: Session, payload: DisputeCreate) -> Dispute:
         customer_name=DEMO_CUSTOMER_NAME,
         merchant_name=payload.merchant_name,
         reason=payload.reason,
+        reason_code=payload.reason_code or infer_reason_code(payload.reason),
         amount=payload.amount,
         currency=payload.currency,
         status=DisputeStatus.OPEN,

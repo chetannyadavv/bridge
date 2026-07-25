@@ -67,6 +67,18 @@ export interface SettlementRecord {
   explanation: string;
   acceptedBy: Role[] | null;
   updatedAt: string;
+  // Sprint 5 Decision Engine output — present on every recommendation
+  // since Sprint 5, but not previously read by the frontend. Optional
+  // since recommendations from before Sprint 5 (if any survive) won't
+  // have these populated.
+  reasonCode?: string;
+  category?: string;
+  engineRecommendation?: string;
+  confidence?: number;
+  summary?: string;
+  reasons?: string[];
+  missingEvidence?: string[];
+  nextSteps?: string[];
 }
 
 export type CaseStatusState = "pending" | "in_progress" | "complete";

@@ -10,6 +10,14 @@ export interface RecommendationDto {
   explanation: string;
   accepted_by: string[];
   updated_at: string;
+  reason_code?: string | null;
+  category?: string | null;
+  engine_recommendation?: string | null;
+  confidence?: number | null;
+  summary?: string | null;
+  reasons?: string[];
+  missing_evidence?: string[];
+  next_steps?: string[];
 }
 
 export function adaptRecommendation(dto: RecommendationDto): SettlementRecord {
@@ -22,6 +30,14 @@ export function adaptRecommendation(dto: RecommendationDto): SettlementRecord {
     explanation: dto.explanation,
     acceptedBy: dto.accepted_by.length > 0 ? (dto.accepted_by as Role[]) : null,
     updatedAt: dto.updated_at,
+    reasonCode: dto.reason_code ?? undefined,
+    category: dto.category ?? undefined,
+    engineRecommendation: dto.engine_recommendation ?? undefined,
+    confidence: dto.confidence ?? undefined,
+    summary: dto.summary ?? undefined,
+    reasons: dto.reasons ?? [],
+    missingEvidence: dto.missing_evidence ?? [],
+    nextSteps: dto.next_steps ?? [],
   };
 }
 

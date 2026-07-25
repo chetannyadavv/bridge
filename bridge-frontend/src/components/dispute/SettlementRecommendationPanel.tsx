@@ -1,5 +1,6 @@
 import type { SettlementRecord } from "@/types/dispute";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
+import { ConfidenceMeter } from "@/components/dispute/ConfidenceMeter";
 import { Scale } from "lucide-react";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -32,7 +33,7 @@ export function SettlementRecommendationPanel({
         </span>
       </CardHeader>
       <CardBody>
-        <div className="flex items-baseline gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <p className="font-display text-2xl font-semibold text-settlement">
             {recommendationLabel[settlement.recommendation]}
             {settlement.percentage !== null && settlement.recommendation === "PARTIAL_REFUND"
@@ -44,7 +45,17 @@ export function SettlementRecommendationPanel({
               revised
             </span>
           )}
+          {typeof settlement.confidence === "number" && (
+            <ConfidenceMeter confidence={settlement.confidence} />
+          )}
         </div>
+
+        {settlement.reasonCode && (
+          <span className="mt-2 inline-block rounded-full bg-black/[0.05] px-2.5 py-1 font-mono text-[11px] text-ink-soft">
+            Reason code {settlement.reasonCode}
+            {settlement.category ? ` · ${settlement.category}` : ""}
+          </span>
+        )}
 
         <p className="mt-3 text-sm leading-relaxed text-ink-soft">{settlement.reason}</p>
 

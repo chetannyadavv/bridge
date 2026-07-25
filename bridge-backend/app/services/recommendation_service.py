@@ -4,62 +4,59 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.dispute import Dispute, DisputeStatus
-from app.models.evidence import Evidence, CredibilityLabel
+from app.models.evidence import Evidence
 from app.models.recommendation import Recommendation, RecommendationType
 from app.models.timeline_event import TimelineEvent
 
-# Sprint 3: mock-only recommendation logic, deliberately simple — ported
-# 1:1 from the frontend's Sprint 2 settlementService.ts so behavior is
-# unchanged now that the backend is the source of truth.
-#
-# Sprint 5 note: this file is the seam. `compute_recommendation` is the
-# only place a recommendation is computed — swap its body for a real
-# call (LLM / rules engine) without changing its signature or callers.
+from app.decision_engine import DecisionEngine
+from app.decision_engine.recommendation_formatter import format_recommendation
+from app.decision_engine.decision_engine import Recommendation as EngineRecommendation
 
-CORROBORATING_LABELS = {
-    CredibilityLabel.VERIFIED_TRANSACTION,
-    CredibilityLabel.GPS_CONFIRMED,
-    CredibilityLabel.TIMESTAMPED_RECEIPT,
+_ENGINE_TO_LEGACY: dict[EngineRecommendation, tuple[RecommendationType, int]] = {
+    EngineRecommendation.APPROVE_REFUND: (RecommendationType.FULL_REFUND, 100),
+    EngineRecommendation.REJECT_REFUND: (RecommendationType.NO_REFUND, 0),
+    EngineRecommendation.PARTIAL_REFUND: (RecommendationType.PARTIAL_REFUND, 50),
+    EngineRecommendation.REQUEST_ADDITIONAL_EVIDENCE: (RecommendationType.NO_REFUND, 0),
+    EngineRecommendation.ESCALATE_FOR_MANUAL_REVIEW: (RecommendationType.NO_REFUND, 0),
 }
+
+# Bug fix: a dispute must not be marked RESOLVED until BOTH parties have
+# accepted. Previously this function set dispute.status = RESOLVED on
+# ANY single acceptance, which meant the moment either party clicked
+# Accept, the OTHER party's screen also read dispute.status === RESOLVED
+# and rendered the final "Dispute resolved" outcome — even though they
+# themselves had never agreed to anything.
+REQUIRED_ACCEPTANCE_ROLES = {"cardholder", "merchant"}
 
 
 def compute_recommendation(
-    dispute_id: str, evidence_items: list[Evidence], previous: Recommendation | None
+    dispute: Dispute, evidence_items: list[Evidence], previous: Recommendation | None
 ) -> Recommendation:
-    corroborating_count = sum(1 for e in evidence_items if e.credibility in CORROBORATING_LABELS)
-    has_merchant = any(e.uploader.value == "merchant" for e in evidence_items)
-    has_cardholder = any(e.uploader.value == "cardholder" for e in evidence_items)
+    engine = DecisionEngine()
+    result = engine.compute(dispute, evidence_items)
+    formatted = format_recommendation(result)
 
-    recommendation = RecommendationType.NO_REFUND
-    percentage = 0
-    reason = "Not enough corroborating evidence has been submitted yet."
-    explanation = "Once more evidence is available, this recommendation will update automatically."
+    legacy_type, legacy_percentage = _ENGINE_TO_LEGACY[result.recommendation]
 
-    if has_merchant and has_cardholder and corroborating_count >= 2:
-        recommendation = RecommendationType.PARTIAL_REFUND
-        percentage = 50
-        reason = "Evidence from both parties partially corroborates the claim."
-        explanation = (
-            f"Based on the evidence submitted so far, a {percentage}% refund reflects a claim "
-            "that is partially, but not fully, supported by verified evidence."
-        )
-    elif has_cardholder and corroborating_count >= 1:
-        recommendation = RecommendationType.PARTIAL_REFUND
-        percentage = 50
-        reason = "Cardholder evidence is corroborated by a verified record; awaiting merchant response."
-        explanation = (
-            "The cardholder's claim is supported by at least one verified record. This "
-            "recommendation may change once the merchant responds."
-        )
+    accepted = list(previous.accepted_by) if previous else []
 
     return Recommendation(
         id=f"st_{uuid.uuid4().hex[:10]}",
-        dispute_id=dispute_id,
-        recommendation=recommendation,
-        percentage=percentage,
-        reason=reason,
-        explanation=explanation,
-        accepted_by=list(previous.accepted_by) if previous else [],
+        dispute_id=dispute.id,
+        recommendation=legacy_type,
+        percentage=legacy_percentage,
+        reason=formatted.summary,
+        explanation=formatted.summary,
+        accepted_by=accepted,
+        sequence=(previous.sequence + 1) if previous else 0,
+        reason_code=result.reason_code,
+        category=result.category,
+        engine_recommendation=result.recommendation.value,
+        confidence=result.confidence,
+        summary=formatted.summary,
+        reasons=formatted.reasons,
+        missing_evidence=formatted.missing_evidence,
+        next_steps=formatted.next_steps,
     )
 
 
@@ -67,7 +64,7 @@ def list_recommendations(db: Session, dispute_id: str) -> list[Recommendation]:
     return (
         db.query(Recommendation)
         .filter(Recommendation.dispute_id == dispute_id)
-        .order_by(Recommendation.updated_at)
+        .order_by(Recommendation.sequence)
         .all()
     )
 
@@ -76,7 +73,7 @@ def get_latest_recommendation(db: Session, dispute_id: str) -> Recommendation | 
     return (
         db.query(Recommendation)
         .filter(Recommendation.dispute_id == dispute_id)
-        .order_by(Recommendation.updated_at.desc())
+        .order_by(Recommendation.sequence.desc())
         .first()
     )
 
@@ -90,17 +87,33 @@ def accept_recommendation(db: Session, dispute: Dispute, role: str) -> Recommend
     if role not in accepted:
         accepted.append(role)
     latest.accepted_by = accepted
-    dispute.status = DisputeStatus.RESOLVED
 
-    db.add(
-        TimelineEvent(
-            id=f"evt_{uuid.uuid4().hex[:10]}",
-            dispute_id=dispute.id,
-            timestamp=datetime.now(timezone.utc),
-            title="Dispute Resolved",
-            description=f"{'Cardholder' if role == 'cardholder' else 'Merchant'} accepted the settlement recommendation.",
+    role_label = "Cardholder" if role == "cardholder" else "Merchant"
+    fully_accepted = REQUIRED_ACCEPTANCE_ROLES.issubset(set(accepted))
+
+    if fully_accepted:
+        dispute.status = DisputeStatus.RESOLVED
+        db.add(
+            TimelineEvent(
+                id=f"evt_{uuid.uuid4().hex[:10]}",
+                dispute_id=dispute.id,
+                timestamp=datetime.now(timezone.utc),
+                title="Dispute Resolved",
+                description=f"{role_label} accepted the settlement recommendation. "
+                            "Both parties have now accepted — dispute resolved.",
+            )
         )
-    )
+    else:
+        db.add(
+            TimelineEvent(
+                id=f"evt_{uuid.uuid4().hex[:10]}",
+                dispute_id=dispute.id,
+                timestamp=datetime.now(timezone.utc),
+                title="Settlement Accepted",
+                description=f"{role_label} accepted the settlement recommendation. "
+                            "Awaiting acceptance from the other party.",
+            )
+        )
 
     db.commit()
     db.refresh(latest)

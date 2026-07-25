@@ -76,8 +76,18 @@ export class DisputeSocket {
     };
 
     socket.onclose = () => {
+      // Bug fix: a deliberate close (e.g. Workspace's role-switch effect
+      // tearing down this socket to open a replacement under the new
+      // role) must NOT report status here. Native WebSocket.close() is
+      // asynchronous — its onclose can fire well after a replacement
+      // socket has already opened, and since connectionStatus is keyed
+      // only by dispute id, an unguarded callback here would clobber the
+      // replacement's correct "open" status back to "closed". Only
+      // genuine, unexpected disconnects should update status and
+      // trigger a reconnect.
+      if (this.closedByClient) return;
       this.handlers.onStatusChange?.("closed");
-      if (!this.closedByClient) this.scheduleReconnect();
+      this.scheduleReconnect();
     };
 
     socket.onerror = () => {

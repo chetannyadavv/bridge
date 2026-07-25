@@ -25,6 +25,11 @@ class Dispute(Base):
     merchant_name = Column(String, nullable=False)
 
     reason = Column(String, nullable=False)
+    # Sprint 5: set at creation (see dispute_service.create_dispute) —
+    # either passed explicitly or inferred from the free-text `reason`
+    # via app.decision_engine.reason_codes.infer_reason_code. Nullable
+    # since a dispute may be filed under a reason with no known mapping.
+    reason_code = Column(String, nullable=True)
     amount = Column(Numeric(10, 2), nullable=False)
     currency = Column(String(3), nullable=False, default="USD")
     status = Column(Enum(DisputeStatus), nullable=False, default=DisputeStatus.OPEN)

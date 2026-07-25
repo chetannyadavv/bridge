@@ -17,12 +17,19 @@ export function Workspace() {
   const { getDispute, getCaseStatus, getPresence, getConnectionStatus, loadDispute, subscribeToDispute } =
     useDisputes();
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  function load() {
     if (!id) return;
     setIsLoading(true);
-    loadDispute(id).finally(() => setIsLoading(false));
-  }, [id, loadDispute]);
+    setLoadError(false);
+    loadDispute(id)
+      .catch(() => setLoadError(true))
+      .finally(() => setIsLoading(false));
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(load, [id, loadDispute]);
 
   // Opens a live connection for this dispute+role while the Workspace is
   // mounted, and tears it down on unmount or when id/role changes —
@@ -38,7 +45,33 @@ export function Workspace() {
   if (isLoading) {
     return (
       <AppShell>
-        <p className="text-sm text-ink-faint">Loading dispute…</p>
+        <div className="flex items-center gap-2 text-sm text-ink-faint">
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-ink-faint border-t-transparent" />
+          Loading dispute…
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <AppShell>
+        <div className="rounded-[var(--radius-card)] border border-cardholder/30 bg-cardholder-tint/30 p-8 text-center">
+          <p className="font-display text-lg font-semibold text-ink">Couldn't load this dispute</p>
+          <p className="mt-1 text-sm text-ink-soft">
+            The server may be unreachable. Check your connection and try again.
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Button variant="settlement" size="sm" onClick={load}>
+              Try again
+            </Button>
+            <Link to="/analyst">
+              <Button variant="secondary" size="sm">
+                Back to dashboard
+              </Button>
+            </Link>
+          </div>
+        </div>
       </AppShell>
     );
   }

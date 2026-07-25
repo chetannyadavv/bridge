@@ -1,11 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import logging
 
 from app.config import settings
 from app.database import Base, engine, SessionLocal
 from app.routers.disputes import router as disputes_router
 from app.routers.websocket import router as websocket_router
 from app.seed import seed_if_empty
+
+logger = logging.getLogger("bridge")
 
 app = FastAPI(title="Bridge API", version="0.1.0")
 
@@ -19,6 +23,22 @@ app.add_middleware(
 
 app.include_router(disputes_router)
 app.include_router(websocket_router)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Sprint 6 robustness: any exception not already handled by a route
+    (HTTPException, validation errors, etc. are handled separately by
+    FastAPI/Starlette before ever reaching here) gets logged server-side
+    with its full detail, but the client only ever sees a generic,
+    friendly message — never a stack trace or internal error text.
+    """
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Something went wrong on our end. Please try again."},
+    )
 
 
 @app.on_event("startup")

@@ -50,7 +50,7 @@ def add_evidence(db: Session, dispute: Dispute, payload: EvidenceCreate) -> Evid
     # transaction, so this already includes the row just added above.
     all_evidence = list_evidence(db, dispute.id)
     previous_recommendation = get_latest_recommendation(db, dispute.id)
-    recommendation = compute_recommendation(dispute.id, all_evidence, previous_recommendation)
+    recommendation = compute_recommendation(dispute, all_evidence, previous_recommendation)
     db.add(recommendation)
     db.flush()
 
