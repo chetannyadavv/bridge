@@ -33,6 +33,12 @@ workflows, and a working demo covering every possible outcome.
    Resolution page: the outcome, the confidence, the reason code, the
    evidence considered, what was missing from each side, and next steps.
 
+## Current status
+
+All 72 tests passing — unit tests for the Decision Engine, integration
+tests against the full API with live WebSocket connections, and
+end-to-end validation of the complete dispute workflow.
+
 ## Quick start
 
 ```
